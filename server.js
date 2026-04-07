@@ -166,8 +166,14 @@ app.post("/chat-agent", async (req, res) => {
 });
 
 // ===== START SERVER =====
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 10000;
+
+app.get("/", (req, res) => {
+  res.send("✅ Backend running");
+});
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log("=================================");
+  console.log(`🚀 SERVER STARTED ON PORT ${PORT}`);
+  console.log("=================================");
 });
