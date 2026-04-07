@@ -109,6 +109,10 @@ app.get("/", (req, res) => {
   res.send("✅ Backend running");
 });
 
+app.get("/", (req, res) => {
+  res.send("✅ Backend running");
+});
+
 // ===== CHAT AGENT =====
 app.post("/chat-agent", async (req, res) => {
   const { message, agent } = req.body;
