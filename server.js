@@ -1,5 +1,3 @@
-console.log("ENV CHECK:", process.env.OPENAI_API_KEY);
-
 import express from "express";
 import dotenv from "dotenv";
 import OpenAI from "openai";
@@ -7,13 +5,14 @@ import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
+console.log("ENV CHECK:", process.env.OPENAI_API_KEY ? "OPENAI KEY FOUND" : "OPENAI KEY MISSING");
+
 const app = express();
 app.use(express.json());
 
 /* =========================
    SAFE OPENAI INIT
 ========================= */
-
 let openai;
 
 try {
@@ -49,24 +48,8 @@ try {
 }
 
 /* =========================
-   BASIC ROUTE (TEST)
+   SIGNAL ENGINE
 ========================= */
-app.get("/", (req, res) => {
-  res.send("✅ Backend running");
-});
-
-/* =========================
-   TEST ENDPOINT
-========================= */
-app.post("/chat-agent", async (req, res) => {
-  if (!openai) {
-    return res.json({ error: "OpenAI not configured yet" });
-  }
-
-  res.json({ result: "API working" });
-});
-
-// ===== SIGNAL ENGINE =====
 async function getAllSignals(query) {
   let news = "No news";
   let gdelt = "No gdelt";
@@ -74,21 +57,16 @@ async function getAllSignals(query) {
   let macro = "No macro";
 
   try {
-    // NEWS
     if (process.env.NEWS_API_KEY) {
       const res = await fetch(
-        `https://newsapi.org/v2/everything?q=${query}&apiKey=${process.env.NEWS_API_KEY}`
+        `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&apiKey=${process.env.NEWS_API_KEY}`
       );
       const data = await res.json();
 
       news =
-        data.articles
-          ?.slice(0, 5)
-          .map((a) => "- " + a.title)
-          .join("\n") || news;
+        data.articles?.slice(0, 5).map((a) => "- " + a.title).join("\n") || news;
     }
 
-    // GDELT (safe)
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
@@ -101,24 +79,19 @@ async function getAllSignals(query) {
       clearTimeout(timeout);
 
       const gd = await g.json();
-
-      gdelt =
-        gd.articles?.map((a) => "- " + a.title).join("\n") || gdelt;
+      gdelt = gd.articles?.map((a) => "- " + a.title).join("\n") || gdelt;
     } catch {
       gdelt = "GDELT unavailable";
     }
 
-    // MARKET
     if (process.env.ALPHA_VANTAGE_API_KEY) {
       const m = await fetch(
         `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`
       );
       const md = await m.json();
-
-      market = JSON.stringify(md["Global Quote"]) || market;
+      market = JSON.stringify(md["Global Quote"] || {}) || market;
     }
 
-    // MACRO
     if (process.env.FRED_API_KEY) {
       const f = await fetch(
         `https://api.stlouisfed.org/fred/series/observations?series_id=GDP&api_key=${process.env.FRED_API_KEY}&file_type=json`
@@ -126,10 +99,7 @@ async function getAllSignals(query) {
       const fd = await f.json();
 
       macro =
-        fd.observations
-          ?.slice(-3)
-          .map((o) => o.value)
-          .join(", ") || macro;
+        fd.observations?.slice(-3).map((o) => o.value).join(", ") || macro;
     }
   } catch (err) {
     console.error("Signal error:", err);
@@ -138,31 +108,53 @@ async function getAllSignals(query) {
   return { news, gdelt, market, macro };
 }
 
-// ===== FORECAST ENGINE =====
+/* =========================
+   FORECAST ENGINE
+========================= */
 function forecastScore(text, signals) {
   let score = 5;
+  const lowerText = (text || "").toLowerCase();
+  const lowerNews = (signals.news || "").toLowerCase();
 
-  if (text.includes("military")) score += 1;
-  if (text.includes("conflict")) score += 2;
-  if (text.includes("war")) score += 3;
-
-  if (signals.news?.includes("attack")) score += 1;
+  if (lowerText.includes("military")) score += 1;
+  if (lowerText.includes("conflict")) score += 2;
+  if (lowerText.includes("war")) score += 3;
+  if (lowerNews.includes("attack")) score += 1;
 
   return Math.min(score, 10);
 }
 
-// ===== HEALTH CHECK =====
+/* =========================
+   HEALTH CHECK
+========================= */
 app.get("/", (req, res) => {
   res.send("✅ Backend running");
 });
 
-app.get("/", (req, res) => {
-  res.send("✅ Backend running");
+/* =========================
+   SIMPLE TEST ENDPOINT
+========================= */
+app.post("/chat-agent-test", async (req, res) => {
+  if (!openai) {
+    return res.json({ error: "OpenAI not configured yet" });
+  }
+
+  res.json({ result: "API working" });
 });
 
-// ===== CHAT AGENT =====
+/* =========================
+   CHAT AGENT
+========================= */
 app.post("/chat-agent", async (req, res) => {
+  if (!openai) {
+    return res.status(500).json({ error: "OpenAI not configured yet" });
+  }
+
   const { message, agent } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: "Message is required" });
+  }
 
   let systemPrompt = "";
 
@@ -172,10 +164,13 @@ app.post("/chat-agent", async (req, res) => {
     systemPrompt = "You are a macroeconomic analyst.";
   } else if (agent === "energy") {
     systemPrompt = "You are an energy analyst.";
+  } else {
+    systemPrompt = "You are an intelligence analyst.";
   }
 
   try {
     const signals = (await getAllSignals(message)) || {};
+    const score = forecastScore(message, signals);
 
     const safeSignals = {
       news: signals.news || "No news",
@@ -184,51 +179,38 @@ app.post("/chat-agent", async (req, res) => {
       macro: signals.macro || "No macro",
     };
 
-    const response = await client.responses.create({
+    const response = await openai.responses.create({
       model: "gpt-4o-mini",
       input:
         systemPrompt +
-        "\n\n=== REAL-TIME INTELLIGENCE SIGNALS ===\n" +
-        "\nNEWS:\n" + safeSignals.news +
+        "\n\n=== REAL-TIME INTELLIGENCE SIGNALS ===" +
+        "\n\nNEWS:\n" + safeSignals.news +
         "\n\nGDELT:\n" + safeSignals.gdelt +
         "\n\nMARKET:\n" + safeSignals.market +
         "\n\nMACRO:\n" + safeSignals.macro +
+        "\n\nBASELINE FORECAST SCORE:\n" + score +
         "\n\n=== USER QUERY ===\n" + message +
-        "\n\nRespond in structured intelligence format:\n" +
+        "\n\nRespond in structured intelligence format:" +
         "\n1. KEY INSIGHT" +
         "\n2. KEY ACTORS" +
         "\n3. STRATEGIC DYNAMICS" +
         "\n4. RISKS" +
-        "\n5. FORECAST\n",
+        "\n5. FORECAST",
     });
 
-    const result = response.output[0].content[0].text;
+    const result = response.output_text || "No response generated";
 
-    res.json({ result });
-
+    res.json({ result, signals: safeSignals, forecastScore: score });
   } catch (error) {
     console.error("ERROR:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-import express from "express";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const app = express();
-
-app.use(express.json());
-
-// other routes here...
-
-// ===== START SERVER =====
+/* =========================
+   START SERVER
+========================= */
 const PORT = process.env.PORT || 10000;
-
-app.get("/", (req, res) => {
-  res.send("✅ Backend running");
-});
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("=================================");
