@@ -1,6 +1,7 @@
 console.log("ENV CHECK:", process.env.OPENAI_API_KEY);
+
 import express from "express";
-import dotenv from "dotenv";
+import dotenv from "dotenv";  
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
@@ -9,10 +10,17 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-// ===== OpenAI =====
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// ✅ NEW SAFE INITIALIZATION
+let openai;
+
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  console.log("✅ OpenAI initialized");
+} else {
+  console.log("⚠️ OPENAI_API_KEY missing — running without OpenAI");
+}
 
 // ===== Supabase =====
 const supabase = createClient(
