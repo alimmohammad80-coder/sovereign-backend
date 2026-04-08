@@ -1,7 +1,7 @@
 console.log("ENV CHECK:", process.env.OPENAI_API_KEY);
 
 import express from "express";
-import dotenv from "dotenv";  
+import dotenv from "dotenv";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,8 +10,10 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-// ✅ NEW SAFE INITIALIZATION
-let openai;
+/* =========================
+   SAFE OPENAI INIT
+========================= */
+let openai = null;
 
 if (process.env.OPENAI_API_KEY) {
   openai = new OpenAI({
@@ -19,14 +21,50 @@ if (process.env.OPENAI_API_KEY) {
   });
   console.log("✅ OpenAI initialized");
 } else {
-  console.log("⚠️ OPENAI_API_KEY missing — running without OpenAI");
+  console.log("⚠️ OPENAI_API_KEY missing");
 }
 
-// ===== Supabase =====
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+/* =========================
+   SAFE SUPABASE INIT
+========================= */
+let supabase = null;
+
+if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
+  );
+  console.log("✅ Supabase initialized");
+} else {
+  console.log("⚠️ Supabase env missing");
+}
+
+/* =========================
+   BASIC ROUTE (TEST)
+========================= */
+app.get("/", (req, res) => {
+  res.send("✅ Backend running");
+});
+
+/* =========================
+   TEST ENDPOINT
+========================= */
+app.post("/chat-agent", async (req, res) => {
+  if (!openai) {
+    return res.json({ error: "OpenAI not configured yet" });
+  }
+
+  res.json({ result: "API working" });
+});
+
+/* =========================
+   SERVER START
+========================= */
+const PORT = process.env.PORT || 3001;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
 
 // ===== SIGNAL ENGINE =====
 async function getAllSignals(query) {
