@@ -66,15 +66,6 @@ app.post("/chat-agent", async (req, res) => {
   res.json({ result: "API working" });
 });
 
-/* =========================
-   SERVER START
-========================= */
-const PORT = process.env.PORT || 3001;
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
-
 // ===== SIGNAL ENGINE =====
 async function getAllSignals(query) {
   let news = "No news";
@@ -220,6 +211,17 @@ app.post("/chat-agent", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+import express from "express";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const app = express();
+
+app.use(express.json());
+
+// other routes here...
 
 // ===== START SERVER =====
 const PORT = process.env.PORT || 10000;
