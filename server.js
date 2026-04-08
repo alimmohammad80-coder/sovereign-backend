@@ -13,30 +13,39 @@ app.use(express.json());
 /* =========================
    SAFE OPENAI INIT
 ========================= */
-let openai = null;
 
-if (process.env.OPENAI_API_KEY) {
-  openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-  console.log("✅ OpenAI initialized");
-} else {
-  console.log("⚠️ OPENAI_API_KEY missing");
+let openai;
+
+try {
+  if (process.env.OPENAI_API_KEY) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    console.log("✅ OpenAI initialized");
+  } else {
+    console.log("⚠️ OpenAI key missing");
+  }
+} catch (err) {
+  console.log("❌ OpenAI init failed:", err.message);
 }
 
 /* =========================
    SAFE SUPABASE INIT
 ========================= */
-let supabase = null;
+let supabase;
 
-if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
-  supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_KEY
-  );
-  console.log("✅ Supabase initialized");
-} else {
-  console.log("⚠️ Supabase env missing");
+try {
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+    supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_KEY
+    );
+    console.log("✅ Supabase initialized");
+  } else {
+    console.log("⚠️ Supabase env missing");
+  }
+} catch (err) {
+  console.log("❌ Supabase init failed:", err.message);
 }
 
 /* =========================
