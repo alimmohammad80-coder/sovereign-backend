@@ -1,3 +1,10 @@
+import globalRiskRoutes from "./routes/globalRiskRoutes.js";
+import riskRoutes from "./routes/riskRoutes.js";
+import memoryRoutes from "./routes/memoryRoutes.js";
+import signalRoutes from "./routes/signalRoutes.js";
+import scenarioRoutes from "./routes/scenarioRoutes.js";
+import fusionRoutes from "./routes/fusionRoutes.js";
+import nemotronRoutes from "./routes/nemotronRoutes.js";
 import express from "express";
 import dotenv from "dotenv";
 import OpenAI from "openai";
@@ -212,6 +219,13 @@ app.post("/chat-agent", async (req, res) => {
 ========================= */
 const PORT = process.env.PORT || 10000;
 
+app.use("/api", nemotronRoutes);
+app.use("/api", fusionRoutes);
+app.use("/api", scenarioRoutes);
+app.use("/api", signalRoutes);
+app.use("/api", memoryRoutes);
+app.use("/api", riskRoutes);
+app.use("/api", globalRiskRoutes);
 app.listen(PORT, "0.0.0.0", () => {
   console.log("=================================");
   console.log(`🚀 SERVER STARTED ON PORT ${PORT}`);
