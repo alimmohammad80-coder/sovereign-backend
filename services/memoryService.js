@@ -1,4 +1,4 @@
-Eimport { createClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -12,6 +12,10 @@ console.log("SUPABASE KEY FOUND:", Boolean(supabaseKey));
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// =======================
+// HELPERS
+// =======================
+
 function normalizeCountries(countryField) {
   if (!countryField) return [];
 
@@ -24,6 +28,10 @@ function normalizeCountries(countryField) {
     .map((c) => c.trim())
     .filter(Boolean);
 }
+
+// =======================
+// SAVE MEMORY
+// =======================
 
 export async function saveIntelligenceMemory({
   requestType,
@@ -40,7 +48,6 @@ export async function saveIntelligenceMemory({
   confidence,
   tags = [],
 }) {
-
   const countries = normalizeCountries(country);
 
   const { data, error } = await supabase
@@ -49,7 +56,7 @@ export async function saveIntelligenceMemory({
       {
         request_type: requestType,
         query,
-        country: countries,   // ✅ THIS is correct
+        country: countries,
         region,
         timeframe,
         raw_signals: rawSignals || [],
@@ -73,6 +80,116 @@ export async function saveIntelligenceMemory({
   return data;
 }
 
+// =======================
+// GLOBAL MAP
+// =======================
+
+export async function getGlobalRiskMap(limit = 150) {
+  const { data, error } = await supabase
+    .from("intelligence_memory")
+    .select("country, overall_risk_score, confidence")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Global risk error:", error.message);
+    return { count: 0, data: [] };
+  }
+
+  const map = {};
+
+  for (const row of data) {
+    const countries = row.country || [];
+
+    for (const c of countries) {
+      if (!map[c]) {
+        map[c] = {
+          country: c,
+          risk_score: row.overall_risk_score || 0,
+          confidence: row.confidence || "low",
+          data_points: 1,
+        };
+      } else {
+        map[c].data_points += 1;
+      }
+    }
+  }
+
+  return {
+    count: Object.keys(map).length,
+    data: Object.values(map).slice(0, limit),
+  };
+}
+
+// =======================
+// COUNTRY RISK
+// =======================
+
+export async function getCountryRisk(country) {
+  const { data, error } = await supabase
+    .from("intelligence_memory")
+    .select("overall_risk_score, confidence, country")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Country risk error:", error.message);
+    return { status: "success" };
+  }
+
+  const filtered = data.filter((row) =>
+    (row.country || []).includes(country)
+  );
+
+  if (filtered.length === 0) {
+    return { status: "success" };
+  }
+
+  return {
+    engine: "sovereign_risk_engine",
+    status: "success",
+    country,
+    risk_score: filtered[0].overall_risk_score || 0,
+    confidence: filtered[0].confidence || "low",
+    data_points: filtered.length,
+  };
+}
+
+// =======================
+// TIMELINE
+// =======================
+
+export async function getCountryRiskTimeline({ country, limit = 30 }) {
+  const { data, error } = await supabase
+    .from("intelligence_memory")
+    .select("created_at, overall_risk_score, confidence, country")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("Timeline error:", error.message);
+    return { country, count: 0, timeline: [] };
+  }
+
+  const timeline = data
+    .filter((row) => (row.country || []).includes(country))
+    .map((row) => ({
+      date: row.created_at,
+      country,
+      risk_score: row.overall_risk_score || 0,
+      confidence: row.confidence || "low",
+    }));
+
+  return {
+    country,
+    count: timeline.length,
+    timeline,
+  };
+}
+
+// =======================
+// MEMORY RETRIEVAL
+// =======================
+
 export async function getIntelligenceMemory({
   country,
   region,
@@ -85,7 +202,7 @@ export async function getIntelligenceMemory({
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (country) query = query.ilike("country", `%${country}%`);
+  if (country) query = query.contains("country", [country]);
   if (region) query = query.ilike("region", `%${region}%`);
   if (requestType) query = query.eq("request_type", requestType);
 
@@ -96,154 +213,5 @@ export async function getIntelligenceMemory({
     return [];
   }
 
-  return data;
-}
-
-export async function getCountryRisk({ country, limit = 20 }) {
-  const { data, error } = await supabase
-    .from("intelligence_memory")
-    .select("overall_risk_score, confidence, created_at")
-    .ilike("country", `%${country}%`)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error("Country risk error:", error.message);
-    return null;
-  }
-
-  if (!data || data.length === 0) {
-    return {
-      country,
-      risk_score: null,
-      trend: "unknown",
-      confidence: "low",
-      data_points: 0,
-    };
-  }
-
-  // average risk
-  const scores = data
-    .map((d) => d.overall_risk_score)
-    .filter((v) => typeof v === "number");
-
-  const avg =
-    scores.reduce((a, b) => a + b, 0) / (scores.length || 1);
-
-  // trend (simple)
-  const recent = scores.slice(0, 3);
-  const older = scores.slice(3, 6);
-
-  let trend = "stable";
-  if (recent.length && older.length) {
-    const rAvg =
-      recent.reduce((a, b) => a + b, 0) / recent.length;
-    const oAvg =
-      older.reduce((a, b) => a + b, 0) / older.length;
-
-    if (rAvg > oAvg + 5) trend = "rising";
-    else if (rAvg < oAvg - 5) trend = "declining";
-  }
-
-  // confidence aggregation
-  const confidenceMap = { low: 1, medium: 2, high: 3 };
-
-  const confAvg =
-    data.reduce(
-      (sum, d) => sum + (confidenceMap[d.confidence] || 1),
-      0
-    ) / data.length;
-
-  const confidence =
-    confAvg > 2.3 ? "high" : confAvg > 1.6 ? "medium" : "low";
-
-  return {
-    country,
-    risk_score: Math.round(avg),
-    trend,
-    confidence,
-    data_points: data.length,
-  };
-}
-
-export async function getGlobalRiskMap({ limit = 50 }) {
-  const { data, error } = await supabase
-    .from("intelligence_memory")
-    .select("country, overall_risk_score, confidence")
-    .not("country", "is", null);
-
-  if (error) {
-    console.error("Global risk error:", error.message);
-    return [];
-  }
-
-  const map = {};
-
-  for (const row of data) {
-    if (!row.country) continue;
-
-    const countries = Array.isArray(row.country)
-      ? row.country
-      : String(row.country).split(/[\/,]/).map((c) => c.trim()).filter(Boolean);
-
-    for (const c of countries) {
-      if (!map[c]) {
-        map[c] = { scores: [], confidence: [] };
-      }
-
-      if (typeof row.overall_risk_score === "number") {
-        map[c].scores.push(row.overall_risk_score);
-      }
-
-      if (row.confidence) {
-        map[c].confidence.push(row.confidence);
-      }
-    }
-  }
-
-  const confidenceMap = { low: 1, medium: 2, high: 3 };
-
-  const result = Object.entries(map).map(([country, val]) => {
-    const avg =
-      val.scores.reduce((a, b) => a + b, 0) / (val.scores.length || 1);
-
-    const confAvg =
-      val.confidence.reduce((a, c) => a + (confidenceMap[String(c).toLowerCase()] || 1), 0) /
-      (val.confidence.length || 1);
-
-    const confidence =
-      confAvg > 2.3 ? "high" : confAvg > 1.6 ? "medium" : "low";
-
-    return {
-      country,
-      risk_score: Math.round(avg),
-      confidence,
-      data_points: val.scores.length,
-    };
-  });
-
-  return result
-    .sort((a, b) => b.risk_score - a.risk_score)
-    .slice(0, limit);
-}
-
-export async function getCountryRiskTimeline({ country, limit = 30 }) {
-  const { data, error } = await supabase
-    .from("intelligence_memory")
-    .select("country, overall_risk_score, confidence, created_at")
-    .contains("country", [country])
-    .order("created_at", { ascending: true })
-    .limit(limit);
-
-  if (error) {
-    console.error("Risk timeline error:", error.message);
-    return [];
-  }
-
-  return data.map((row) => ({
-    date: row.created_at,
-    country,
-    risk_score: row.overall_risk_score,
-    confidence: row.confidence,
-  }));
+  return data || [];
 }
