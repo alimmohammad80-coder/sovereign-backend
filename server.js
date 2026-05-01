@@ -7,6 +7,7 @@ import scenarioRoutes from "./routes/scenarioRoutes.js";
 import fusionRoutes from "./routes/fusionRoutes.js";
 import nemotronRoutes from "./routes/nemotronRoutes.js";
 import express from "express";
+import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
