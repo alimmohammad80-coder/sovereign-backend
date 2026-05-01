@@ -1,3 +1,4 @@
+
 import globalRiskRoutes from "./routes/globalRiskRoutes.js";
 import riskRoutes from "./routes/riskRoutes.js";
 import memoryRoutes from "./routes/memoryRoutes.js";
@@ -15,6 +16,11 @@ dotenv.config();
 console.log("ENV CHECK:", process.env.OPENAI_API_KEY ? "OPENAI KEY FOUND" : "OPENAI KEY MISSING");
 
 const app = express();
+
+app.use(cors({
+  origin: "*",
+}));
+
 app.use(express.json());
 
 /* =========================
