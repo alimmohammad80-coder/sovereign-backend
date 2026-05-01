@@ -84,7 +84,7 @@ export async function saveIntelligenceMemory({
 // GLOBAL MAP
 // =======================
 
-export async function getGlobalRiskMap(limit = 150) {
+export async function getGlobalRiskMap({ limit = 150 } = {}) {
   const { data, error } = await supabase
     .from("intelligence_memory")
     .select("country, overall_risk_score, confidence")
