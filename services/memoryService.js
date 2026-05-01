@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+Eimport { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -11,6 +11,19 @@ console.log("SUPABASE_URL FOUND:", Boolean(supabaseUrl));
 console.log("SUPABASE KEY FOUND:", Boolean(supabaseKey));
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+function normalizeCountries(countryField) {
+  if (!countryField) return [];
+
+  if (Array.isArray(countryField)) {
+    return countryField.map((c) => String(c).trim()).filter(Boolean);
+  }
+
+  return String(countryField)
+    .split(/[\/,]/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
 
 export async function saveIntelligenceMemory({
   requestType,
