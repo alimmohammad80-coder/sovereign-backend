@@ -234,7 +234,8 @@ app.use("/api", memoryRoutes);
 app.use("/api", riskRoutes);
 app.use("/api", globalRiskRoutes);
 app.get("/api/debug/supply-chain-counts", async (req, res) => {
-  try {
+app.use("/api", supplyChainRoutes); 
+ try {
     const chains = await supabase.from("supply_chains").select("*");
     const nodes = await supabase.from("supply_chain_nodes").select("*");
     const countries = await supabase.from("countries").select("*").limit(10);
@@ -256,10 +257,13 @@ app.get("/api/debug/supply-chain-counts", async (req, res) => {
         data: countries.data || [],
       },
     });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.use("/api", supplyChainRoutes); 
 
 app.get("/api/supply-chain/risk", async (req, res) => {
   try {
