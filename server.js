@@ -234,7 +234,6 @@ app.use("/api", memoryRoutes);
 app.use("/api", riskRoutes);
 app.use("/api", globalRiskRoutes);
 app.get("/api/debug/supply-chain-counts", async (req, res) => {
-app.use("/api", supplyChainRoutes); 
  try {
     const chains = await supabase.from("supply_chains").select("*");
     const nodes = await supabase.from("supply_chain_nodes").select("*");
@@ -263,7 +262,6 @@ app.use("/api", supplyChainRoutes);
   }
 });
 
-app.use("/api", supplyChainRoutes); 
 
 app.get("/api/supply-chain/risk", async (req, res) => {
   try {
