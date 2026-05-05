@@ -1,4 +1,4 @@
-
+import supplyChainRoutes from "./routes/supplyChainRoutes.js";
 import globalRiskRoutes from "./routes/globalRiskRoutes.js";
 import riskRoutes from "./routes/riskRoutes.js";
 import memoryRoutes from "./routes/memoryRoutes.js";
@@ -1397,6 +1397,7 @@ app.post("/api/investor/portfolio-stress-test", async (req, res) => {
   }
 });
 
+app.use("/api", supplyChainRoutes);
 
 // 🚀 ALWAYS LAST
 app.listen(PORT, "0.0.0.0", () => {
