@@ -1,3 +1,4 @@
+import macroRoutes from "./routes/macro.js";
 import supplyChainRoutes from "./routes/supplyChainRoutes.js";
 import globalRiskRoutes from "./routes/globalRiskRoutes.js";
 import riskRoutes from "./routes/riskRoutes.js";
@@ -1400,6 +1401,10 @@ app.post("/api/investor/portfolio-stress-test", async (req, res) => {
 });
 
 app.use("/api", supplyChainRoutes);
+
+app.use("/api/macro", macroRoutes);
+
+
 
 // 🚀 ALWAYS LAST
 app.listen(PORT, "0.0.0.0", () => {
