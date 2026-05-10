@@ -1404,6 +1404,57 @@ app.use("/api", supplyChainRoutes);
 
 app.use("/api/macro", macroRoutes);
 
+app.get("/api/agents/latest", async (req, res) => {
+  try {
+    const { category } = req.query;
+
+    let query = supabase
+      .from("agent_outputs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (category) {
+      query = query.eq("category", category);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    res.json({
+      engine: "latest_agent_outputs",
+      status: "success",
+      category: category || "all",
+      count: data?.length || 0,
+      data: data || [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+app.get("/api/fusion/latest", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("fusion_briefings")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+
+    res.json({
+      engine: "fusion_briefings",
+      status: "success",
+      count: data?.length || 0,
+      data: data || [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 // 🚀 ALWAYS LAST
